@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Santa Birthday Quest</title>
+<style>
+:root{color-scheme:light;--pink:#e8a9bd;--ink:#4b3440;--paper:#fff8fa;--line:#e8d5dd}
+*{box-sizing:border-box}
+body{margin:0;background:#fff3f7;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:650px;margin:auto;padding:18px 14px 35px}
+header{text-align:center;padding:10px 0 18px}
+.kicker{font-size:11px;letter-spacing:3px;font-weight:800;color:#a45b78}
+h1{font-size:clamp(25px,7vw,36px);line-height:1.1;margin:8px 0}
+.sub{font-size:14px;color:#876a78;line-height:1.5}
+.panel{background:white;border:1px solid var(--line);border-radius:18px;padding:14px;margin:12px 0;box-shadow:0 5px 18px #d99eb31c}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.small{font-size:12px;color:#987d8a}
+#board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:14px auto;max-width:520px;aspect-ratio:5/4}
+.cell{min-width:0;min-height:0;position:relative;border:1px solid #e3cad5;border-radius:5px;overflow:hidden;background:#fff1f6;display:flex;align-items:center;justify-content:center;padding:0}
+.cell img,.piece img{width:100%;height:100%;object-fit:cover;display:block}
+.cell.empty{border:2px dashed #cf7595;background:#fff7fa}
+.cell.empty:after{content:"?";font-weight:800;font-size:clamp(15px,4vw,24px);color:#cf7595}
+.cell.locked{background:#f8e5ec;border:2px dashed #d6a0b3}
+.cell.locked:after{content:"🔒";font-size:clamp(10px,3vw,18px)}
+.pieces{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.piece{padding:3px;border:1px solid var(--line);background:white;border-radius:9px;min-width:0;aspect-ratio:1;overflow:hidden;cursor:grab;touch-action:manipulation}
+.piece.selected{outline:3px solid #d06f92;outline-offset:1px}
+button{font:inherit;cursor:pointer}
+.action{border:1px solid var(--line);background:white;color:var(--ink);border-radius:11px;padding:10px 12px;font-weight:650}
+.action.primary{background:#d982a1;color:white;border-color:#d982a1}
+.action:disabled{opacity:.45}
+#status{font-size:13px;line-height:1.5;min-height:22px;margin-top:10px}
+#question{border:1px solid #e8c6d3;background:#fff8fb;border-radius:14px;padding:14px;margin-top:12px}
+.option{display:block;width:100%;text-align:left;padding:11px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);margin-top:8px}
+.option:disabled{opacity:.6}
+[hidden]{display:none!important}
+footer{font-size:11px;line-height:1.5;color:#987d8a;text-align:center;margin-top:18px}
+@media(max-width:380px){main{padding:12px 9px}.panel{padding:10px}.pieces{gap:4px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="kicker">BIRTHDAY SPECIAL</div>
+ <h1>Santa's Missing Pieces</h1>
+ <div class="sub">ghép đủ bức tranh, trả lời câu hỏi để mở khóa 5 mảnh cuối.</div>
+</header>
+<section class="panel">
+ <div class="row"><strong>bức tranh bí mật</strong><span class="small" id="progressText">0/20 mảnh</span></div>
+ <div class="sub" style="margin-top:5px">kéo mảnh vào đúng ô. Trên điện thoại, chạm một mảnh rồi chạm ô muốn đặt.</div>
+ <div id="board" aria-label="bảng ghép tranh"></div>
+ <div class="row small"><span>tiến độ</span><span id="percent">0%</span></div>
+ <div style="height:5px;background:#f1dfe6;border-radius:8px;overflow:hidden;margin-top:5px"><div id="bar" style="height:100%;width:0;background:#d982a1;transition:width .2s"></div></div>
+ <div id="status" aria-live="polite">hãy chọn một mảnh ghép bên dưới để bắt đầu.</div>
+</section>
+<section class="panel">
+ <div class="row" style="margin-bottom:10px"><strong>mảnh ghép</strong><span class="small">15 mảnh ban đầu</span></div>
+ <div id="tray" class="pieces"></div>
+ <div id="question" hidden aria-live="polite"></div>
+ <div id="finish" hidden style="text-align:center;padding:18px 5px">
+  <h2>hoàn thành!</h2><p>m đã mở khóa và ghép đủ 20 mảnh.</p>
+  <p><strong>mã demo: SANTA-BDAY-20</strong></p>
+  <p class="small">khi dùng thật, hãy đổi mã này và đặt quy tắc xác nhận giveaway riêng.</p>
+ </div>
+</section>
+<div class="row"><button id="reset" class="action">chơi lại</button><button id="hint" class="action">gợi ý</button></div>
+<footer>đây là bản mẫu. ảnh hiện tại là hình minh họa; có thể thay bằng ảnh Santa sau khi tải ảnh lên cùng repository.</footer>
+</main>
+<script>
+/* Khi có ảnh thật, tải ảnh lên repository cùng thư mục với index.html,
+   đặt tên santa.jpg rồi đổi IMAGE_URL thành "santa.jpg". */
+const IMAGE_URL = "";
+const lockedSlots = [3,7,12,16,18]; // 5 ô bị khóa, đánh số từ 0
+const questions = {
+  3:{q:"câu hỏi mẫu 1: santa là ai trong event sinh nhật này?",a:["một diễn viên/nghệ sĩ mà mình yêu thích","một nhân vật hoạt hình","một địa điểm du lịch"],correct:0},
+  7:{q:"câu hỏi mẫu 2: fan đang cùng nhau làm gì?",a:["giải ô chữ","ghép tranh sinh nhật","đua xe"],correct:1},
+  12:{q:"câu hỏi mẫu 3: trả lời đúng câu hỏi sẽ làm gì?",a:["mở khóa mảnh ghép","đóng trang web","xóa bức tranh"],correct:0},
+  16:{q:"câu hỏi mẫu 4: bức tranh có tổng cộng bao nhiêu ô?",a:["12 ô","15 ô","20 ô"],correct:2},
+  18:{q:"câu hỏi mẫu 5: đây là phiên bản nào?",a:["bản demo","trang bán hàng","bản tin thời tiết"],correct:0}
+};
+const board=document.querySelector("#board"),tray=document.querySelector("#tray"),status=document.querySelector("#status"),questionBox=document.querySelector("#question"),finish=document.querySelector("#finish");
+let placed=new Set(),unlocked=new Set(),selected=null,answered=new Set();
+function svgPlaceholder(i){
+ const colors=["#f5d9e4","#e5d9f0","#f6e4c8","#d9e8e2","#dce7f3"];
+ const c=colors[Math.floor(i/4)%colors.length];
+ const x=i%5,y=Math.floor(i/5);
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${c}"/><circle cx="${20+x*13}" cy="${24+y*9}" r="23" fill="#fff8fa" opacity=".65"/><path d="M0 80 Q40 55 100 78 V100 H0Z" fill="#d7a2b7"/><rect x="27" y="38" width="46" height="62" rx="18" fill="#a87994"/><circle cx="50" cy="36" r="25" fill="#f8e7d9"/><path d="M24 35 Q20 5 50 9 Q78 5 77 35 Q60 20 24 35Z" fill="#5c4357"/><circle cx="41" cy="37" r="2.5" fill="#4b3440"/><circle cx="59" cy="37" r="2.5" fill="#4b3440"/><path d="M43 47 Q50 53 57 47" fill="none" stroke="#b56d82" stroke-width="2"/><text x="50" y="94" text-anchor="middle" font-size="10" fill="#fff">${i+1}</text></svg>`;
+}
+function imageFor(i){
+ if(!IMAGE_URL)return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgPlaceholder(i));
+ // Each tile crops its own part from the same full image.
+ const x=i%5,y=Math.floor(i/5);
+ return null;
+}
+function makeTile(i){
+ if(IMAGE_URL){
+   const wrap=document.createElement("div");wrap.style.cssText="width:100%;height:100%;overflow:hidden;position:relative";
+   const img=document.createElement("img");img.src=IMAGE_URL;img.alt="mảnh ghép "+(i+1);
+   img.style.cssText=`position:absolute;width:500%;height:400%;max-width:none;object-fit:fill;left:${-(i%5)*100}%;top:${-Math.floor(i/5)*100}%`;
+   wrap.appendChild(img);return wrap;
+ }
+ const img=document.createElement("img");img.src=imageFor(i);img.alt="mảnh minh họa "+(i+1);return img;
+}
+function draw(){
+ board.innerHTML="";tray.innerHTML="";
+ for(let i=0;i<20;i++){
+  const cell=document.createElement("button");cell.type="button";cell.className="cell";cell.dataset.cell=i;
+  if(placed.has(i)){cell.appendChild(makeTile(i));cell.setAttribute("aria-label","ô "+(i+1)+" đã ghép");}
+  else if(lockedSlots.includes(i)&&!unlocked.has(i)){cell.classList.add("locked");cell.setAttribute("aria-label","ô bị khóa bằng câu hỏi");}
+  else{cell.classList.add("empty");cell.setAttribute("aria-label","ô trống "+(i+1));}
+  cell.addEventListener("click",()=>place(selected,i));
+  cell.addEventListener("dragover",e=>e.preventDefault());
+  cell.addEventListener("drop",e=>{e.preventDefault();const n=Number(e.dataTransfer.getData("text/plain"));place(n,i);});
+  board.appendChild(cell);
+ }
+ for(let i=0;i<20;i++){
+  if(placed.has(i)||(lockedSlots.includes(i)&&!unlocked.has(i)))continue;
+  const p=document.createElement("button");p.type="button";p.className="piece"+(selected===i?" selected":"");p.draggable=true;p.dataset.piece=i;p.setAttribute("aria-label","chọn mảnh "+(i+1));p.appendChild(makeTile(i));
+  p.addEventListener("click",()=>{selected=i;draw();status.textContent="đã chọn mảnh "+(i+1)+". hãy chạm ô muốn đặt.";});
+  p.addEventListener("dragstart",e=>{selected=i;e.dataTransfer.setData("text/plain",String(i));});
+  tray.appendChild(p);
+ }
+ const n=placed.size;document.querySelector("#progressText").textContent=n+"/20 mảnh";document.querySelector("#percent").textContent=Math.round(n/20*100)+"%";document.querySelector("#bar").style.width=(n/20*100)+"%";
+ if(n===20){finish.hidden=false;questionBox.hidden=true;status.textContent="bức tranh đã hoàn thành."; }
+}
+function place(piece,cell){
+ if(piece===null||piece===undefined||placed.has(piece))return;
+ if(lockedSlots.includes(cell)&&!unlocked.has(cell)){ask(cell);return;}
+ if(piece!==cell){status.textContent="mảnh này chưa đúng ô. thử vị trí khác nhé.";return;}
+ placed.add(piece);selected=null;status.textContent="đúng vị trí rồi!";draw();
+ if(placed.size===15&&lockedSlots.some(i=>!unlocked.has(i))){status.textContent="ủa, sao vẫn còn thiếu 5 mảnh? trả lời câu hỏi để mở khóa nhé.";ask(lockedSlots.find(i=>!unlocked.has(i)));}
+}
+function ask(i){
+ if(unlocked.has(i))return;
+ questionBox.hidden=false;finish.hidden=true;
+ const q=questions[i];questionBox.innerHTML=`<div class="small">mảnh ghép ${i+1}/20</div><strong>${q.q}</strong><div class="small" style="margin-top:5px">trả lời đúng để mở khóa mảnh này.</div>`;
+ q.a.forEach((label,j)=>{const b=document.createElement("button");b.type="button";b.className="option";b.textContent=label;b.addEventListener("click",()=>{if(j===q.correct){unlocked.add(i);placed.add(i);answered.add(i);selected=null;questionBox.hidden=true;status.textContent="chính xác! mảnh ghép đã tự xuất hiện vào bức tranh.";draw();if(lockedSlots.some(k=>!unlocked.has(k)))ask(lockedSlots.find(k=>!unlocked.has(k)));}else{b.disabled=true;b.textContent=label+" — thử đáp án khác";status.textContent="chưa đúng, thử đáp án khác nhé.";}});questionBox.appendChild(b);});
+ const later=document.createElement("button");later.type="button";later.className="action";later.style.marginTop="10px";later.textContent="để sau";later.addEventListener("click",()=>questionBox.hidden=true);questionBox.appendChild(later);
+}
+document.querySelector("#reset").addEventListener("click",()=>{placed=new Set();unlocked=new Set();answered=new Set();selected=null;questionBox.hidden=true;finish.hidden=true;status.textContent="hãy chọn một mảnh ghép bên dưới để bắt đầu.";draw();});
+document.querySelector("#hint").addEventListener("click",()=>{status.textContent=selected===null?"chọn một mảnh bên dưới. mỗi mảnh cần vào ô cùng vị trí trong bức tranh.":"mảnh đã chọn là số "+(selected+1)+". thử ghép vào ô tương ứng.";});
+draw();
+</script>
+</body>
+</html>
